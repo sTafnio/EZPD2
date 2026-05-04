@@ -219,6 +219,7 @@ VOID MainLoop()
 
     DrawVendorPreview();
     DrawMartialArtsCharges();
+    DrawBoneArmour();
 
     DrawNearbyEntities();
     DrawTownPortalOwnerLabels();

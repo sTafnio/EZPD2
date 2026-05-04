@@ -439,7 +439,9 @@ VOID DrawNearbyEntities()
 						objects.push_back(entity);
 					}
 				}
-				else if (strstr(entity.Name, "Spire of Darkness") != NULL)
+				else if (std::find(std::begin(InterestingObjectTextFileNo),
+								   std::end(InterestingObjectTextFileNo), Unit->dwTxtFileNo) !=
+						 std::end(InterestingObjectTextFileNo))
 				{
 					if (Unit->pObjectPath)
 					{

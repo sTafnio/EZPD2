@@ -63,6 +63,7 @@
   <ItemGroup>
     <ClInclude Include="ArrayEx.h" />
     <ClInclude Include="AutoExitPotion.h" />
+    <ClInclude Include="BoneArmour.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="D2Structs.h" />
     <ClInclude Include="D2Pointers.h" />
@@ -89,6 +90,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AutoExitPotion.cpp" />
+    <ClCompile Include="BoneArmour.cpp" />
     <ClCompile Include="DebugDrawing.cpp" />
     <ClCompile Include="Drawing.cpp" />
     <ClCompile Include="D2Stubs.cpp" />

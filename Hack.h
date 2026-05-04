@@ -48,6 +48,7 @@
 
 #include "ArrayEx.h"
 #include "AutoExitPotion.h"
+#include "BoneArmour.h"
 #include "Constants.h"
 #include "D2Pointers.h"
 #include "D2Structs.h"

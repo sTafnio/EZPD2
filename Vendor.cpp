@@ -1,4 +1,5 @@
 #include "Hack.h"
+#include <cstring>
 
 VOID DrawVendorPreview()
 {
@@ -101,6 +102,7 @@ enum AnyaBotPhase
     ANYA_SEND_TRADE_DOWN,
     ANYA_SEND_TRADE_ENTER,
     ANYA_WAIT_SHOP_UI,
+    ANYA_RECOVER_CLEAR_NPC_UI,
     ANYA_CHECK_SHOP_ITEMS,
     ANYA_PREP_PURCHASE_ITEM,
     ANYA_CLICK_PURCHASE_TAB,
@@ -140,10 +142,12 @@ struct AnyaBotCtx
     DWORD        portalBackReadyTick;
     DWORD        vendorReadyTick;
     DWORD        retryReadyTick;
+    DWORD        recoverUiStartTick;
+    bool         recoverClearQuiet;
     AnyaPurchaseTarget purchaseTargets[64];
 };
 
-static AnyaBotCtx s_anya = { ANYA_IDLE, 0, 0, false, {0, 0}, 0, 0, 0, 0, 0, 0, 0, {} };
+static AnyaBotCtx s_anya = { ANYA_IDLE, 0, 0, false, {0, 0}, 0, 0, 0, 0, 0, 0, 0, 0, false, {} };
 
 static const DWORD ANYA_INTERACT_DELAY_MS      = 250;
 static const DWORD ANYA_SHOP_TO_TAB_DELAY_MS   = 1000;
@@ -152,12 +156,17 @@ static const DWORD ANYA_STAND_READY_POLL_MS      = 50;
 static const DWORD ANYA_STAND_READY_TIMEOUT_MS = 8000;
 static const DWORD ANYA_PORTAL_BACK_HOVER_MS     = 500;
 static const DWORD ANYA_VENDOR_HOVER_MS          = 500;
-static const DWORD ANYA_RETRY_DELAY_MS         = 750;
+static const DWORD ANYA_RETRY_DELAY_MS         = 200;
 static const DWORD ANYA_VENDOR_HOLD_MS         = 110;
-static const DWORD ANYA_VENDOR_MENU_TIMEOUT_MS = 2000;
+static const DWORD ANYA_VENDOR_MENU_TIMEOUT_MS = 550;
 static const DWORD ANYA_SHOP_TIMEOUT_MS        = 2000;
 static const DWORD ANYA_TRANSITION_TIMEOUT_MS  = 3000;
+static const DWORD ANYA_ESCAPE_CLEAR_INTERVAL_MS = 350;
+static const DWORD ANYA_RECOVER_UI_TIMEOUT_MS    = 8000;
 static const int   ANYA_MAX_RETRIES            = 4;
+
+// After shop UI opens, wait INTERACT delay plus extra settle time before scanning stock.
+static const DWORD ANYA_CHECK_SHOP_ITEMS_DELAY_MS = ANYA_INTERACT_DELAY_MS + 150;
 
 static LPUNITANY FindAnyaVendorUnit()
 {
@@ -312,6 +321,34 @@ static VOID FailAnyaStep(const char* reason)
     ExitAnyaBot();
 }
 
+// Vendor dialogue / shop open only: after max retries, Escape until UI clears then re-run click -> shop.
+static VOID FailAnyaShopInteractionStep(const char* reason)
+{
+    if (s_anya.retries < ANYA_MAX_RETRIES)
+    {
+        s_anya.retries++;
+        if (strcmp(reason, "vendor menu did not open") != 0)
+            PrintText(FONTCOLOR_RED, "Anya Bot retry %d/%d: %s", s_anya.retries, ANYA_MAX_RETRIES, reason);
+        s_anya.phase = ANYA_IDLE;
+        s_anya.retryReadyTick = GetTickCount() + ANYA_RETRY_DELAY_MS;
+        s_anya.tick  = GetTickCount();
+        return;
+    }
+
+    PrintText(FONTCOLOR_YELLOW,
+              "Anya Bot: %s after %d retries — pressing Escape until NPC/shop UI closes, then retrying vendor.",
+              reason,
+              ANYA_MAX_RETRIES);
+    s_anya.retries = 0;
+    DWORD now = GetTickCount();
+    s_anya.phase               = ANYA_RECOVER_CLEAR_NPC_UI;
+    s_anya.recoverUiStartTick  = now;
+    s_anya.tick                = now;
+    s_anya.retryReadyTick      = 0;
+    s_anya.recoverClearQuiet   = false;
+    SimulateKeyPress(VK_ESCAPE);
+}
+
 VOID AnyaBot()
 {
     if (!V_AnyaBotRunning)
@@ -370,7 +407,6 @@ VOID AnyaBot()
         {
             s_anya.phase = ANYA_SEND_TRADE_DOWN;
             s_anya.tick  = now;
-            s_anya.retries = 0;
             return;
         }
         if (now - s_anya.tick < ANYA_INTERACT_DELAY_MS)
@@ -384,7 +420,7 @@ VOID AnyaBot()
                 return;
             }
 
-            POINT screenPos = { vendor->pPath->xPos, vendor->pPath->yPos };
+            POINT screenPos = { (LONG)D2CLIENT_GetUnitX(vendor), (LONG)D2CLIENT_GetUnitY(vendor) };
             WorldToScreen(&screenPos);
             s_anya.clickPos = screenPos;
             SetCursorPos(screenPos.x, screenPos.y);
@@ -419,7 +455,7 @@ VOID AnyaBot()
 
         if (now - s_anya.tick > ANYA_VENDOR_MENU_TIMEOUT_MS)
         {
-            FailAnyaStep("vendor menu did not open");
+            FailAnyaShopInteractionStep("vendor menu did not open");
             return;
         }
         return;
@@ -427,6 +463,7 @@ VOID AnyaBot()
     case ANYA_SEND_TRADE_DOWN:
         if (GetUIVar(UI_NPCSHOP))
         {
+            s_anya.retries = 0;
             s_anya.phase = ANYA_CHECK_SHOP_ITEMS;
             s_anya.tick = now;
             return;
@@ -449,6 +486,7 @@ VOID AnyaBot()
     case ANYA_WAIT_SHOP_UI:
         if (GetUIVar(UI_NPCSHOP))
         {
+            s_anya.retries = 0;
             s_anya.phase = ANYA_CHECK_SHOP_ITEMS;
             s_anya.tick  = now;
             return;
@@ -456,13 +494,52 @@ VOID AnyaBot()
 
         if (now - s_anya.tick > ANYA_SHOP_TIMEOUT_MS)
         {
-            FailAnyaStep("shop did not open");
+            if (GetUIVar(UI_NPCMENU) || GetUIVar(UI_NPCSHOP))
+            {
+                s_anya.phase              = ANYA_RECOVER_CLEAR_NPC_UI;
+                s_anya.recoverUiStartTick = now;
+                s_anya.tick               = now;
+                s_anya.retryReadyTick     = 0;
+                s_anya.recoverClearQuiet  = true;
+                SimulateKeyPress(VK_ESCAPE);
+            }
+            else
+            {
+                s_anya.phase = ANYA_PREP_VENDOR_CLICK;
+                s_anya.tick  = now;
+                s_anya.vendorReadyTick = now;
+            }
             return;
         }
         return;
 
+    case ANYA_RECOVER_CLEAR_NPC_UI:
+        if (!GetUIVar(UI_NPCMENU) && !GetUIVar(UI_NPCSHOP))
+        {
+            if (!s_anya.recoverClearQuiet)
+                PrintText(FONTCOLOR_LIGHTGREEN, "Anya Bot: NPC UI cleared, retrying vendor from click");
+            s_anya.recoverClearQuiet = false;
+            s_anya.retries = 0;
+            s_anya.phase = ANYA_PREP_VENDOR_CLICK;
+            s_anya.tick  = now;
+            s_anya.vendorReadyTick = now;
+            return;
+        }
+        if (now - s_anya.recoverUiStartTick > ANYA_RECOVER_UI_TIMEOUT_MS)
+        {
+            PrintText(FONTCOLOR_RED, "Anya Bot failed: NPC/shop UI did not close (Escape timeout)");
+            ExitAnyaBot();
+            return;
+        }
+        if (now - s_anya.tick >= ANYA_ESCAPE_CLEAR_INTERVAL_MS)
+        {
+            SimulateKeyPress(VK_ESCAPE);
+            s_anya.tick = now;
+        }
+        return;
+
     case ANYA_CHECK_SHOP_ITEMS:
-        if (now - s_anya.tick < ANYA_INTERACT_DELAY_MS)
+        if (now - s_anya.tick < ANYA_CHECK_SHOP_ITEMS_DELAY_MS)
             return;
         {
             LPUNITANY vendor = D2CLIENT_GetCurrentInteractingNPC();
@@ -770,6 +847,8 @@ VOID ResetAnyaBot()
     s_anya.portalBackReadyTick = 0;
     s_anya.vendorReadyTick = 0;
     s_anya.retryReadyTick = 0;
+    s_anya.recoverUiStartTick = 0;
+    s_anya.recoverClearQuiet  = false;
 }
 
 VOID ExitAnyaBot()

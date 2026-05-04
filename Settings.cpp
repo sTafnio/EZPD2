@@ -62,6 +62,7 @@ Setting g_settings[] = {
     {"TradeInviteReplyEnabled", &V_TradeInviteReplyEnabled, SETTING_BOOL, FALSE},
     {"TradeInviteReplyKey", &V_TradeInviteReplyKey, SETTING_INT, 0},
     {"MartialArtsChargesEnabled", &V_MartialArtsChargesEnabled, SETTING_BOOL, TRUE},
+    {"BoneArmourEnabled", &V_BoneArmourEnabled, SETTING_BOOL, FALSE},
     {"BuildMAChargesEnabled", &V_BuildMAChargesEnabled, SETTING_BOOL, FALSE},
     {"MAAutomateEnabled", &V_MAAutomateEnabled, SETTING_BOOL, FALSE},
     {"MartialArtSkillButton", &V_MartialArtSkillButton, SETTING_INT, VK_RBUTTON},

@@ -133,7 +133,8 @@ const UnitClassIdMapping trackedCampaignObjects[] = {
 	{396, "Seal"},				// Seal left
 	{473, "Prison"},			// 3 Prisons in A5
 	{462, "Nihlathak"},			// Tile that Nihlathak is on
-	{593, "Spire of Darkness"},	
+	{593, "Spire of Darkness"},
+	{611, "Altar of the Catalyst"},
 
 	{60, "Red Portal"}, // Red Portals in A5
 

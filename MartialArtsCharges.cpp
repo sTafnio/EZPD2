@@ -30,7 +30,7 @@ static VOID DrawChargePips(INT x, INT y, INT charges, DWORD color)
 
 VOID DrawMartialArtsCharges()
 {
-    if (!V_MartialArtsChargesEnabled || !GameReady() || !Me || V_MainMenuOpen || IsFullScreenPanelOpen())
+    if (!V_MartialArtsChargesEnabled || !GameReady() || !Me || V_MainMenuOpen || IsFullScreenPanelOpen() || IsPlayerInTown())
         return;
 
     // Assassin-only helper.
@@ -59,7 +59,6 @@ VOID DrawMartialArtsCharges()
         return;
 
     const INT screenCenterX = (*p_D2CLIENT_ScreenSizeX) / 2;
-    const INT screenCenterY = (*p_D2CLIENT_ScreenSizeY) / 2;
 
     const INT pipSize = 12;
     const INT spacing = 6;
@@ -67,8 +66,10 @@ VOID DrawMartialArtsCharges()
     const INT rowSpacing = 6;
     const INT rowWidth = (pipSize * 3) + (spacing * 2);
     const INT totalHeight = (activeCount * rowHeight) + ((activeCount - 1) * rowSpacing);
-    const INT startX = screenCenterX - (rowWidth / 2);
-    const INT startY = screenCenterY - (totalHeight / 2);
+    const INT anchorX = screenCenterX - 80;
+    const INT anchorY = 90;
+    const INT startX = anchorX - (rowWidth / 2);
+    const INT startY = anchorY - (totalHeight / 2);
 
     for (INT i = 0; i < activeCount; ++i)
     {

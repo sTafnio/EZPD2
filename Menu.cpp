@@ -472,6 +472,14 @@ void InitMenu()
     g_menuColumn3.push_back(item);
 
     item = MenuItem();
+    item.label = "Show Bone Armour";
+    item.type = Checkbox;
+    item.boolValue = &V_BoneArmourEnabled;
+    item.indent = 1;
+    item.parentIndex = -1;
+    g_menuColumn3.push_back(item);
+
+    item = MenuItem();
     item.label = "Martial Arts Automate";
     item.type = Label;
     item.indent = 0;

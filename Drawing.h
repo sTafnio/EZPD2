@@ -51,6 +51,7 @@ const int InterestingMonsterTextFileNo[] = {
 
 const int InterestingObjectTextFileNo[] = {
     593, // Spire of Darkness
+    611, // Altar of the Catalyst
     };
 
 VOID DrawTextB(INT X, INT Y, DWORD Color, INT Font, INT Center, LPSTR Text, ...);
